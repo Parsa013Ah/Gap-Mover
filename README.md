@@ -314,12 +314,6 @@ PROGRESS_REPORT_INTERVAL = 10
 ![GitHub issues](https://img.shields.io/github/issues/Parsa013Ah/Gap-Mover)
 ![GitHub license](https://img.shields.io/github/license/Parsa013Ah/Gap-Mover)
 
-**📊 آمار استفاده:**
-- 🌟 1000+ ستاره
-- 🍴 500+ فورک  
-- 👥 50+ مشارکت‌کننده
-- 🐛 5 مشکل فعال
-
 </div>
 
 ---
