@@ -353,10 +353,8 @@ PROGRESS_REPORT_INTERVAL = 10
 | روش | لینک | زمان پاسخ |
 |-----|------|----------|
 | 🐛 **GitHub Issues** | [Issues](https://github.com/Parsa013Ah/Gap-Mover/issues) | 24 ساعت |
-| 💬 **Telegram** | [@Parsa013Ah](https://t.me/Parsa013Ah) | آنی |
-| 📧 **Email** | parsa013ah@gmail.com | 48 ساعت |
-| 📚 **Wiki** | [Wiki](https://github.com/Parsa013Ah/Gap-Mover/wiki) | همیشه |
-
+| 💬 **Telegram** | [@POH013]https://t.me/POH013) | آنی |
+| 📧 **Email** | parsah013@gmail.com | 48 ساعت |
 </div>
 
 ---
@@ -366,7 +364,7 @@ PROGRESS_REPORT_INTERVAL = 10
 ```
 MIT License
 
-Copyright (c) 2024 Your Name
+Copyright (c) 2024 Parsa13Ah
 
 مجوز استفاده، کپی، تغییر و توزیع این نرم‌افزار به صورت رایگان داده شده است.
 ```
@@ -376,31 +374,6 @@ Copyright (c) 2024 Your Name
 ## ⭐ تشکر ویژه
 
 <div align="center">
-
-**🙏 از همه کسانی که در توسعه این پروژه مشارکت کرده‌اند تشکر می‌کنیم**
-
-<table>
-<tr>
-<td align="center">
-<a href="#">
-<img src="https://avatars.githubusercontent.com/u/1?v=4" width="100px;"/><br />
-<sub><b>نام مشارکت‌کننده</b></sub>
-</a>
-</td>
-<td align="center">
-<a href="#">
-<img src="https://avatars.githubusercontent.com/u/2?v=4" width="100px;"/><br />
-<sub><b>نام مشارکت‌کننده</b></sub>
-</a>
-</td>
-<td align="center">
-<a href="#">
-<img src="https://avatars.githubusercontent.com/u/3?v=4" width="100px;"/><br />
-<sub><b>نام مشارکت‌کننده</b></sub>
-</a>
-</td>
-</tr>
-</table>
 
 ---
 
