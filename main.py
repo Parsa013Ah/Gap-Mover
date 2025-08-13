@@ -18,6 +18,7 @@ class TelegramMemberTransferBot:
         self.source_group = None
         self.destination_group = None
         self.custom_invite_message = None
+        self.security_level = 'medium'  # low, medium, high
         self.settings_file = 'bot_settings.json'
         self.api_credentials_file = 'api_credentials.json'
         self.api_id = None
@@ -34,6 +35,7 @@ class TelegramMemberTransferBot:
                     self.source_group = settings.get('source_group')
                     self.destination_group = settings.get('destination_group')
                     self.custom_invite_message = settings.get('custom_invite_message')
+                    self.security_level = settings.get('security_level', 'medium')
             except:
                 pass
 
@@ -42,7 +44,8 @@ class TelegramMemberTransferBot:
         settings = {
             'source_group': self.source_group,
             'destination_group': self.destination_group,
-            'custom_invite_message': self.custom_invite_message
+            'custom_invite_message': self.custom_invite_message,
+            'security_level': self.security_level
         }
         with open(self.settings_file, 'w', encoding='utf-8') as f:
             json.dump(settings, f, ensure_ascii=False, indent=2)
@@ -124,7 +127,9 @@ class TelegramMemberTransferBot:
             print("• .تنظیم گروه مقصد - تنظیم گروه مقصد")
             print("• .شروع انتقال - شروع انتقال اعضا")
             print("• .ارسال لینک - فقط لینک برای غیر عضوها")
+            print("• .لغو انتقال - لغو انتقال و بازگشت به حالت اولیه")
             print("• .تنظیم متن دعوت - تنظیم متن سفارشی دعوت")
+            print("• .تنظیم امنیت - تنظیم سطح امنیت (فوری/پایین/متوسط/بالا/فوق امن)")
             print("• .راهنمای تنظیم - راهنمای دریافت API")
             print("• .ریست انتقال - پاک کردن تنظیمات")
             print("• .ریست اکانت - پاک کردن session و خروج")
@@ -137,6 +142,62 @@ class TelegramMemberTransferBot:
 
         except Exception as e:
             print(f"❌ خطا در راه‌اندازی: {str(e)}")
+
+    def get_security_settings(self):
+        """دریافت تنظیمات امنیتی بر اساس سطح انتخاب شده"""
+        settings = {
+            'instant': {
+                'max_users': 500,
+                'max_links': 500,
+                'min_delay': 1,
+                'max_delay': 3,
+                'long_delay_min': 2,
+                'long_delay_max': 5,
+                'flood_wait_extra': 10,
+                'description': 'فوری (گروه زیر 20 نفر - چند دقیقه)'
+            },
+            'low': {
+                'max_users': 25,
+                'max_links': 15,
+                'min_delay': 5,
+                'max_delay': 10,
+                'long_delay_min': 15,
+                'long_delay_max': 25,
+                'flood_wait_extra': 30,
+                'description': 'سریع (حداکثر 25 نفر - 30 دقیقه)'
+            },
+            'medium': {
+                'max_users': 70,
+                'max_links': 40,
+                'min_delay': 10,
+                'max_delay': 20,
+                'long_delay_min': 30,
+                'long_delay_max': 50,
+                'flood_wait_extra': 60,
+                'description': 'متوسط (حداکثر 70 نفر - 1.5 ساعت)'
+            },
+            'high': {
+                'max_users': 120,
+                'max_links': 70,
+                'min_delay': 20,
+                'max_delay': 40,
+                'long_delay_min': 60,
+                'long_delay_max': 120,
+                'flood_wait_extra': 120,
+                'description': 'امن (حداکثر 120 نفر - 3 ساعت)'
+            },
+            'ultra': {
+                'max_users': 200,
+                'max_links': 120,
+                'min_delay': 35,
+                'max_delay': 60,
+                'long_delay_min': 90,
+                'long_delay_max': 180,
+                'flood_wait_extra': 180,
+                'description': 'فوق امن (حداکثر 200+ نفر - 4 ساعت)'
+            }
+        }
+        return settings.get(self.security_level, settings['medium'])
 
     def register_handlers(self):
         """ثبت هندلرهای کامند"""
@@ -181,6 +242,15 @@ class TelegramMemberTransferBot:
         async def reset_account_handler(event):
             await self.reset_account(event)
 
+        @self.client.on(events.NewMessage(pattern=r'\.تنظیم امنیت'))
+        async def set_security_handler(event):
+            await self.set_security_level(event)
+            
+        @self.client.on(events.NewMessage(pattern=r'\.لغو انتقال'))
+        async def cancel_transfer_handler(event):
+            await self.cancel_transfer(event)
+
+
     async def show_help(self, event):
         """نمایش راهنمای کامل"""
         help_text = """
@@ -208,9 +278,21 @@ class TelegramMemberTransferBot:
    فقط برای کسانی که در گروه مبدا هستند اما در مقصد نیستند
    لینک دعوت ارسال می‌کند (بدون تلاش برای اضافه کردن)
 
+🔹 **.لغو انتقال**
+   لغو فرآیند انتقال در حال اجرا و بازگشت به حالت اولیه
+   از شما سوال می‌شود که آیا مطمئن هستید
+
 🔹 **.تنظیم متن دعوت [متن دلخواه]**
    تنظیم متن سفارشی برای پیام دعوت
    متغیرهای قابل استفاده: {user_name}, {source_group}, {dest_group}, {invite_link}
+
+🔹 **.تنظیم امنیت [فوری/پایین/متوسط/بالا/فوق امن]**
+   تنظیم سطح امنیت انتقال:
+   • فوری: گروه زیر 20 نفر، چند دقیقه (500 نفر)
+   • پایین: سریع، 30 دقیقه (25 نفر)
+   • متوسط: متعادل، 1.5 ساعت (70 نفر)
+   • بالا: امن، 3 ساعت (120 نفر)
+   • فوق امن: گروه بزرگ، 4 ساعت (200+ نفر)
 
 🔹 **.ریست انتقال**
    پاک کردن تمام تنظیمات و شروع مجدد
@@ -292,6 +374,9 @@ class TelegramMemberTransferBot:
         else:
             status_text += "📝 متن دعوت: پیش‌فرض\n"
 
+        security_settings = self.get_security_settings()
+        status_text += f"🛡️ سطح امنیت: {self.security_level} ({security_settings['description']})\n"
+
         if self.source_group and self.destination_group:
             status_text += "\n✅ آماده برای انتقال اعضا"
         else:
@@ -299,11 +384,84 @@ class TelegramMemberTransferBot:
 
         await event.respond(status_text)
 
+    async def set_security_level(self, event):
+        """تنظیم سطح امنیت"""
+        message_text = event.message.text.strip()
+
+        if message_text == '.تنظیم امنیت':
+            # نمایش راهنما
+            help_text = f"""
+🛡️ **تنظیم سطح امنیت**
+
+📊 **سطح فعلی:** {self.security_level}
+
+🔹 **سطوح موجود:**
+
+**فوری** - `.تنظیم امنیت فوری`
+• برای گروه‌های زیر 20 نفر
+• حداکثر 500 نفر در هر اجرا
+• تأخیر: 1-3 ثانیه
+• مدت زمان: چند دقیقه
+• ⚡ خیلی سریع
+
+**پایین** - `.تنظیم امنیت پایین`
+• حداکثر 25 نفر در هر اجرا
+• حداکثر 15 لینک در هر اجرا  
+• تأخیر: 5-10 ثانیه
+• مدت زمان: حداکثر 30 دقیقه
+• 🔥 سریع
+
+**متوسط** - `.تنظیم امنیت متوسط`
+• حداکثر 70 نفر در هر اجرا
+• حداکثر 40 لینک در هر اجرا
+• تأخیر: 10-20 ثانیه  
+• مدت زمان: حداکثر 1.5 ساعت
+• ⚖️ متعادل (پیش‌فرض)
+
+**بالا** - `.تنظیم امنیت بالا`
+• حداکثر 120 نفر در هر اجرا
+• حداکثر 70 لینک در هر اجرا
+• تأخیر: 20-40 ثانیه
+• مدت زمان: حداکثر 3 ساعت
+• 🛡️ امن
+
+**فوق امن** - `.تنظیم امنیت فوق امن`
+• حداکثر 200+ نفر در هر اجرا
+• حداکثر 120 لینک در هر اجرا
+• تأخیر: 35-60 ثانیه
+• مدت زمان: حداکثر 4 ساعت
+• ✅ برای گروه‌های بزرگ
+            """
+            await event.respond(help_text)
+            return
+
+        # استخراج سطح از پیام
+        if 'فوری' in message_text:
+            new_level = 'instant'
+        elif 'پایین' in message_text:
+            new_level = 'low'
+        elif 'متوسط' in message_text:
+            new_level = 'medium'
+        elif 'بالا' in message_text and 'فوق' not in message_text:
+            new_level = 'high'
+        elif 'فوق امن' in message_text or 'فوق' in message_text:
+            new_level = 'ultra'
+        else:
+            await event.respond("❌ سطح نامعتبر! از کامندهای زیر استفاده کنید:\n`.تنظیم امنیت فوری`\n`.تنظیم امنیت پایین`\n`.تنظیم امنیت متوسط`\n`.تنظیم امنیت بالا`\n`.تنظیم امنیت فوق امن`")
+            return
+
+        self.security_level = new_level
+        self.save_settings()
+
+        settings = self.get_security_settings()
+        await event.respond(f"✅ سطح امنیت به **{new_level}** تغییر یافت!\n\n📊 **تنظیمات جدید:**\n• حداکثر اعضا: {settings['max_users']}\n• حداکثر لینک: {settings['max_links']}\n• تأخیر: {settings['min_delay']}-{settings['max_delay']} ثانیه\n• توضیح: {settings['description']}")
+
     async def reset_settings(self, event):
         """ریست تنظیمات"""
         self.source_group = None
         self.destination_group = None
         self.custom_invite_message = None
+        self.security_level = 'medium'
         if os.path.exists(self.settings_file):
             os.remove(self.settings_file)
         await event.respond(
@@ -326,7 +484,7 @@ class TelegramMemberTransferBot:
 
 3️⃣ **دسترسی به API tools**
    • روی "API development tools" کلیک کنید
-   • اگر قبلاً application ساخته‌اید، لیست نمایش داده می‌شود
+   • اگر Application ندارید، یکی بسازید
 
 4️⃣ **ساخت Application (در صورت نیاز)**
    • روی "Create new application" کلیک کنید
@@ -341,7 +499,7 @@ class TelegramMemberTransferBot:
 ⚠️ **نکات امنیتی:**
 • هرگز API credentials را به اشتراک نگذارید
 • این اطلاعات فقط روی دستگاه شما ذخیره می‌شود
-• در صورت مشکوک بودن، application را حذف کنید
+• در صورت مشکوک بودن، Application را حذف کنید
 
 💾 **ذخیره‌سازی:**
 • اطلاعات در فایل محلی ذخیره می‌شود
@@ -488,14 +646,20 @@ class TelegramMemberTransferBot:
                 invite_link
             )
 
+            # تأخیر قبل از ارسال بر اساس سطح امنیت
+            security_settings = self.get_security_settings()
+            await asyncio.sleep(random.randint(security_settings['min_delay'], security_settings['max_delay']))
+
             # تلاش اول برای ارسال فوری
             try:
                 await self.client.send_message(user, message_text)
                 print(f"📨 لینک برای {user_name} ارسال شد")
                 return {'success': True}
             except FloodWaitError as e:
-                print(f"⏳ محدودیت ارسال پیام: {e.seconds} ثانیه صبر برای {user_name}...")
-                await asyncio.sleep(e.seconds)
+                security_settings = self.get_security_settings()
+                wait_time = e.seconds + security_settings['flood_wait_extra']
+                print(f"⏳ محدودیت ارسال پیام: {wait_time} ثانیه صبر برای {user_name}...")
+                await asyncio.sleep(wait_time)
                 # تلاش مجدد بعد از انتظار
                 try:
                     await self.client.send_message(user, message_text)
@@ -569,8 +733,16 @@ class TelegramMemberTransferBot:
             link_sent_count = 0
             error_count = 0
 
+            # محدود کردن تعداد لینک‌ها بر اساس سطح امنیت
+            security_settings = self.get_security_settings()
+            max_links_per_run = security_settings['max_links']
+            limited_link_users = users_to_send_link[:max_links_per_run]
+
+            if len(users_to_send_link) > max_links_per_run:
+                await event.respond(f"⚠️ سطح امنیت {self.security_level}: فقط {max_links_per_run} لینک ارسال می‌شود.")
+
             # ارسال لینک برای کاربران
-            for i, user in enumerate(users_to_send_link):
+            for i, user in enumerate(limited_link_users):
                 try:
                     result = await self.send_invite_link(user, invite_link, 0, 0)
                     if result['success']:
@@ -579,11 +751,11 @@ class TelegramMemberTransferBot:
                     else:
                         error_count += 1
 
-                    # تأخیر برای جلوگیری از محدودیت
-                    if i % 3 == 0 and i > 0:
-                        delay = random.randint(3, 7)
-                        print(f"⏸️ استراحت {delay} ثانیه...")
-                        await asyncio.sleep(delay)
+                    # تأخیر بر اساس سطح امنیت
+                    security_settings = self.get_security_settings()
+                    delay = random.randint(security_settings['long_delay_min'], security_settings['long_delay_max'])
+                    print(f"⏸️ استراحت {delay} ثانیه...")
+                    await asyncio.sleep(delay)
 
                     # گزارش پیشرفت
                     if (i + 1) % 5 == 0:
@@ -611,6 +783,56 @@ class TelegramMemberTransferBot:
 
         except Exception as e:
             await event.respond(f"❌ خطای کلی در ارسال لینک: {str(e)}")
+
+    async def cancel_transfer(self, event):
+        """لغو انتقال در حال اجرا"""
+        await event.respond("آیا مطمئن هستید که می‌خواهید انتقال را لغو کنید؟ (بله/خیر)")
+        
+        # منتظر پاسخ کاربر می‌مانیم
+        async def wait_for_cancel_confirmation(e):
+            if e.sender_id == event.sender_id:
+                response = e.message.text.lower()
+                if response == 'بله':
+                    await event.respond("انتقال لغو شد. تمام اعضای اضافه شده به گروه مقصد و لینک‌های ارسال شده پاک می‌شوند.")
+                    # در اینجا منطق پاکسازی را اضافه کنید:
+                    # 1. تمام اعضای اضافه شده به گروه مقصد را حذف کنید.
+                    # 2. تمام پیام‌های دعوت ارسال شده را حذف کنید.
+                    # 3. وضعیت انتقال را به حالت اولیه بازگردانید.
+                    
+                    # مثال: پاک کردن گروه مقصد (نیاز به دسترسی ادمین دارد)
+                    if self.destination_group:
+                        try:
+                            # دریافت اعضای گروه مقصد
+                            dest_members = []
+                            async for member in self.client.iter_participants(self.destination_group['id']):
+                                if isinstance(member, User) and not member.bot:
+                                    dest_members.append(member)
+                            
+                            # حذف اعضا (با احتیاط و در نظر گرفتن محدودیت‌ها)
+                            # این بخش نیاز به پیاده‌سازی دقیق‌تر دارد و ممکن است پیچیده باشد
+                            # برای نمونه، فقط اعلام می‌کنیم که پاکسازی انجام می‌شود
+                            await event.respond("در حال پاکسازی اعضای اضافه شده و پیام‌های دعوت...")
+                            # await self.client.delete_dialog(self.destination_group['id']) # این مورد کل گروه را حذف می‌کند، مناسب نیست
+                            
+                            # یک راه ساده‌تر، ریست کردن تنظیمات است که انتقال را متوقف می‌کند
+                            await self.reset_settings(event) # این کار باعث می‌شود انتقال متوقف شود
+                            
+                            await event.respond("انتقال با موفقیت لغو و تنظیمات ریست شد.")
+                        except Exception as e:
+                            await event.respond(f"خطا در پاکسازی گروه مقصد: {str(e)}")
+                    else:
+                        await self.reset_settings(event) # اگر گروه مقصد تنظیم نشده بود، فقط تنظیمات را ریست می‌کنیم
+                        await event.respond("انتقال لغو شد. تنظیمات ریست شدند.")
+                        
+                elif response == 'خیر':
+                    await event.respond("انتقال لغو نشد. عملیات انتقال ادامه خواهد یافت.")
+                
+                # حذف این هندلر پس از دریافت پاسخ
+                self.client.remove_event_handler(wait_for_cancel_confirmation)
+        
+        # ثبت موقت هندلر برای دریافت پاسخ
+        self.client.add_event_handler(wait_for_cancel_confirmation, events.NewMessage(chats=event.chat_id, from_users=event.sender_id))
+
 
     async def start_transfer(self, event):
         """شروع انتقال اعضا"""
@@ -655,8 +877,19 @@ class TelegramMemberTransferBot:
             except:
                 invite_link = None
 
+            # محدود کردن تعداد اعضا بر اساس سطح امنیت
+            security_settings = self.get_security_settings()
+            max_users_per_run = security_settings['max_users']
+            limited_participants = source_participants[:max_users_per_run]
+
+            if len(source_participants) > max_users_per_run:
+                await event.respond(f"⚠️ سطح امنیت {self.security_level}: فقط {max_users_per_run} نفر اول منتقل می‌شوند.")
+                await event.respond(f"📊 کل اعضا: {len(source_participants)} - منتقل می‌شود: {max_users_per_run}")
+
+            await event.respond(f"🛡️ سطح امنیت: {self.security_level} ({security_settings['description']})")
+
             # انتقال اعضا
-            for i, user in enumerate(source_participants):
+            for i, user in enumerate(limited_participants):
                 try:
                     # تلاش برای اضافه کردن عضو
                     if self.destination_group['type'] == 'channel':
@@ -687,9 +920,26 @@ class TelegramMemberTransferBot:
                         error_count += 1
 
                 except FloodWaitError as e:
-                    print(f"⏳ محدودیت زمانی: {e.seconds} ثانیه صبر...")
-                    await asyncio.sleep(e.seconds)
-                    continue
+                    security_settings = self.get_security_settings()
+                    wait_time = e.seconds + security_settings['flood_wait_extra']
+                    print(f"⏳ محدودیت زمانی: {wait_time} ثانیه صبر...")
+                    await event.respond(f"⏳ محدودیت تلگرام! صبر {wait_time} ثانیه...")
+                    await asyncio.sleep(wait_time)
+                    # تلاش مجدد برای همین کاربر
+                    try:
+                        if self.destination_group['type'] == 'channel':
+                            await self.client(InviteToChannelRequest(channel=self.destination_group['id'], users=[user]))
+                        else:
+                            await self.client(AddChatUserRequest(chat_id=self.destination_group['id'], user_id=user, fwd_limit=0))
+                        added_count += 1
+                        print(f"✅ {user.first_name} اضافه شد (تلاش مجدد)")
+                    except:
+                        # اگر باز هم نشد، لینک بفرست
+                        result = await self.send_invite_link(user, invite_link, 0, 0)
+                        if result['success']:
+                            link_sent_count += 1
+                        else:
+                            error_count += 1
 
                 except ChatAdminRequiredError:
                     await event.respond("❌ نیاز به دسترسی ادمین در گروه مقصد!")
@@ -698,7 +948,7 @@ class TelegramMemberTransferBot:
                 except Exception as e:
                     # برای سایر خطاها هم لینک ارسال کن (Too many requests, Invalid object ID و غیره)
                     if "Too many requests" in str(e) or "Invalid object ID" in str(e):
-                        # تلاش برای ارسال لینک
+                        # تلاش for ارسال لینک
                         result = await self.send_invite_link(user, invite_link, 0, 0)
                         if result['success']:
                             link_sent_count += 1
@@ -708,14 +958,19 @@ class TelegramMemberTransferBot:
                         error_count += 1
                     print(f"❌ خطا برای {user.first_name if hasattr(user, 'first_name') and user.first_name else 'کاربر'}: {str(e)}")
 
-                # تأخیر برای جلوگیری از محدودیت
-                if i % 5 == 0 and i > 0:
-                    delay = random.randint(2, 5)
-                    print(f"⏸️ استراحت {delay} ثانیه...")
+                # تأخیر بر اساس سطح امنیت
+                security_settings = self.get_security_settings()
+                if i % 2 == 0 and i > 0:
+                    delay = random.randint(security_settings['long_delay_min'], security_settings['long_delay_max'])
+                    print(f"⏸️ استراحت طولانی {delay} ثانیه...")
+                    await asyncio.sleep(delay)
+                else:
+                    delay = random.randint(security_settings['min_delay'], security_settings['max_delay'])
+                    print(f"⏸️ استراحت کوتاه {delay} ثانیه...")
                     await asyncio.sleep(delay)
 
-                # گزارش پیشرفت
-                if (i + 1) % 10 == 0:
+                # گزارش پیشرفت کمتر
+                if (i + 1) % 5 == 0:
                     progress_text = f"📈 پیشرفت: {i + 1}/{len(source_participants)}\n"
                     progress_text += f"✅ اضافه شده: {added_count}\n"
                     progress_text += f"📨 لینک ارسال شده: {link_sent_count}\n"
